@@ -2,18 +2,16 @@
 
 ## 1. Context & Scope
 
-This document captures the formal Architectural Decision Records (ADRs) established during Phase 0 foundation setup, alongside an explicit register of accepted assumptions and deferred decisions.
+This document records the confirmed Architectural Decision Records (ADRs) established for the USDX stablecoin protocol, alongside an explicit register of items deferred to subsequent phases.
 
 ---
 
-## 2. Phase 0 Architectural Decision Records (ADRs)
+## 2. Confirmed Architectural Decision Records (ADRs)
 
 ### ADR-01: Smart Contract Toolchain Selection
 - **Status:** Approved
-- **Context:** Need a fast, reliable, reproducible local development and testing toolchain for Solidity smart contracts.
 - **Decision:** Select **Foundry** (`forge`, `cast`) as the primary smart-contract compilation and testing framework.
-- **Rationale:** Foundry provides ultra-fast Rust-native compilation, solid unit testing in Solidity, gas profiling, and granular EVM target configuration capabilities.
-- **Consequences:** All contract tests must be written in Solidity under `test/`. Contract compilation MUST enforce `evm_version = "london"`.
+- **Rationale:** Foundry provides fast compilation, native Solidity testing, gas profiling, and EVM target configuration capabilities.
 
 ### ADR-02: EVM Target & Compiler Compatibility Baseline (`london` EVM & `0.8.20` solc)
 - **Status:** Approved
@@ -80,7 +78,7 @@ This document captures the formal Architectural Decision Records (ADRs) establis
 
 ---
 
-## 3. Register of Unresolved Decisions & Assumptions
+## 3. Register of Items Requiring Implementation Validation
 
 | ID | Item Subject | Category | Status / Current Assumption | Next Steps / Resolution Phase |
 | :--- | :--- | :--- | :--- | :--- |
