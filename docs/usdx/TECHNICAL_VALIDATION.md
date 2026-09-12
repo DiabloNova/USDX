@@ -18,13 +18,13 @@ Claims are classified according to five status categories:
 | ID | Claim Subject | Status | Summary Findings & Evidence |
 | :--- | :--- | :--- | :--- |
 | **TVM-01** | **TRC-20 Compatibility** | **Verified** | TRC-20 standard specification mirrors ERC-20 (`totalSupply`, `balanceOf`, `transfer`, `approve`, `transferFrom`, `Transfer`, `Approval`). TRON TVM natively executes ERC-20 compliant bytecode. |
-| **TVM-02** | **Solidity 0.8.20 & EVM Target Baseline** | **Partially Verified** | `solc 0.8.20` is the current Phase 0 baseline compiler version, not an irreversible lifetime decision. The `PUSH0` instruction was added to TVM via TRON's Shanghai hardfork gate (TIP-572 / GreatVoyage-v4.7.4). However, `evm_version = "london"` remains the pinned project compatibility baseline to ensure maximum safety across all testnet/mainnet node configurations until target network parameters are verified. |
-| **TVM-03** | **Address Representation (`0x41` Prefix)** | **Verified** | On-chain TVM bytecodes use 20-byte EVM addresses prefixed with `0x41` in raw bytes (21 bytes total). User-facing displays format these as Base58Check strings starting with 'T'. Off-chain tools must translate between Base58 and `0x41` hex formats. |
-| **TVM-04** | **TRON Account Permissions / Native Multisig** | **Partially Verified** | TRON native account structure supports Multi-Signature (Owner, Witness, Active permissions). Contract execution authority managed by a smart contract Timelock/Multisig operates at the contract layer, distinct from native TRON account permissions. |
-| **TVM-05** | **Energy & Bandwidth Model** | **Verified** | Execution on TRON consumes Energy (smart contract CPU/storage) and Bandwidth (transaction byte size). Callers or fee limiters must stake TRX or rent Energy to avoid consuming liquid TRX or encountering `OUT_OF_ENERGY` errors. |
-| **TVM-06** | **`feeLimit` Parameter** | **Verified** | TRON transactions require an explicit `feeLimit` parameter (in SUN, 1 TRX = 1,000,000 SUN) set on the transaction envelope. If `feeLimit` is set too low for complex contract calls, the transaction reverts with `OUT_OF_ENERGY`. |
-| **TVM-07** | **Deterministic Deployment (`CREATE2`)** | **Partially Verified** | `CREATE2` opcode is supported by TVM. High-level Solidity salted deployment is portable, but off-chain address calculation tools, scripts, and assumptions must account for TRON's `0x41` address representation prefix. `CREATE2` is not identical to Ethereum in every tooling context. |
-| **TVM-08** | **OpenZeppelin Compatibility** | **Partially Verified** | OpenZeppelin Contracts cannot be treated as blanket-verified for TRON. USDX must use official tagged releases (e.g., v4.9 / v5.x). Each required module (AccessControl, Pausable, UUPSUpgradeable) must be validated at the exact version/module level and tested on TRON testnets. |
+| **TVM-02** | **Solidity Baseline & EVM Target Version** | **Partially Verified** | Solidity `0.8.20` with `evm_version = "london"` is the project's conservative compilation baseline. This baseline avoids opcode compatibility issues on networks lacking EVM Shanghai features. Shanghai/`PUSH0` availability is network/hardfork dependent and serves as a compatibility gate rather than a permanent TVM limitation. |
+| **TVM-03** | **Address Representation** | **Verified** | On-chain TVM bytecodes use 20-byte EVM addresses prefixed with `0x41` in raw TRON protocol bytes (21 bytes total). User-facing displays format these as Base58Check strings starting with 'T'. Off-chain tools and SDKs must translate between Base58Check and `0x41` hex formats. |
+| **TVM-04** | **TRON Account Permissions / Native Multisig** | **Partially Verified** | TRON native account structure supports Multi-Signature (Owner, Witness, Active permissions). However, contract execution authority managed by a smart contract Timelock/Multisig (e.g. Gnosis-style contract multisig) operates at the contract layer, distinct from native TRON account permissions. |
+| **TVM-05** | **Energy & Bandwidth Model** | **Verified** | Execution on TRON consumes Energy (smart contract CPU/storage execution) and Bandwidth (transaction byte size). Accounts pay for execution via staked TRX resource allowances or direct TRX burning. |
+| **TVM-06** | **`feeLimit` Parameter** | **Verified** | TRON transactions require an explicit `feeLimit` parameter (in SUN, 1 TRX = 1,000,000 SUN) set on the transaction envelope to cap maximum TRX burned. If execution exceeds `feeLimit`, the transaction reverts with `OUT_OF_ENERGY`. |
+| **TVM-07** | **Deterministic Deployment (`CREATE2`)** | **Partially Verified** | The `CREATE2` opcode is supported by TVM, and high-level Solidity salted deployment syntax (`new Contract{salt: ...}()`) remains portable. However, manual address calculations and deployment tooling must account for TRON's `0x41` address prefix and address derivation algorithm. |
+| **TVM-08** | **OpenZeppelin Module Compatibility** | **Partially Verified** | OpenZeppelin contracts cannot be assumed to have blanket TRON compatibility. Pinned official tagged releases must be evaluated at the specific module level, compiled under project settings (`solc 0.8.20` + `london`), and verified on target TRON testnets. |
 | **TVM-09** | **Contract Verification on TRONSCAN** | **Verified** | TRONSCAN supports contract source verification via API or Web UI, requiring single-file flattened source or standard JSON input matching exact compiler version, optimization runs, and EVM target. |
 | **TVM-10** | **Chainlink Proof of Reserve (PoR)** | **Unverified** | Chainlink PoR native feed availability on TRON Mainnet is limited. Architecture relies on a primary Multi-Attestor Quorum model for reserve updates rather than assuming native Chainlink PoR feeds are available. |
 | **TVM-11** | **SunSwap Architecture & DEX Sequencing** | **Partially Verified** | SunSwap (V1/V2/V3 forks of Uniswap) operates standard constant-product or concentrated liquidity pairs. DEX deployment is strictly post-launch and is NOT a prerequisite for USDX mainnet deployment. |
@@ -34,21 +34,33 @@ Claims are classified according to five status categories:
 
 ## 3. Detailed Technical Analysis
 
-### 3.1 Solidity Compiler & TVM Shanghai / `PUSH0` Opcodes
-- **Background:** `solc 0.8.20` introduced `PUSH0` as part of the `shanghai` EVM specification.
-- **TVM Capability:** Recent TRON protocol upgrades introduced Shanghai EVM features (including `PUSH0` support via TIP-572 / GreatVoyage-v4.7.4). However, `PUSH0` availability is network-specific and depends on active chain parameters of the target deployment node/network.
-- **Project Policy:** `solc 0.8.20` is selected as the current baseline. To guarantee execution safety across all TRON environments, `evm_version = "london"` remains pinned in project configuration. Changing EVM targets requires explicit verification against active target testnet/mainnet node parameters.
+### 3.1 Solidity Compiler, Baseline & EVM Hardfork Gates
+- **Project Baseline:** Solidity `0.8.20` is the current compiler baseline for USDX development, with `evm_version = "london"` configured in `foundry.toml` as a conservative compilation baseline.
+- **EVM Versioning & Compatibility:** Pinned compilation to `london` is a conservative default for toolchain safety and portability across TRON target environments; it is not an irreversible lifetime decision.
+- **TVM Hardfork & `PUSH0` Availability:** The `PUSH0` opcode introduced in the EVM Shanghai specification (default in `solc` >= 0.8.20) is supported on TRON TVM versions that have enabled the corresponding network proposal/hardfork. However, because hardfork capabilities vary by network environment (e.g. local test harness, Nile testnet, Shasta testnet, or Mainnet), Shanghai/`PUSH0` availability must be treated as a network/hardfork compatibility gate. Target networks must be validated before updating the baseline compilation target beyond `london`.
 
-### 3.2 Address Representation & `CREATE2` Semantics
-- **TRON Address Bytes:** On-chain TVM bytecodes prepend `0x41` (TRON mainnet/testnet network byte) to 20-byte EVM addresses.
-- **`CREATE2` Tooling:** While high-level Solidity `new Contract{salt: salt}()` statements function natively in TVM, manual off-chain `CREATE2` address derivation (e.g., in deployment scripts or SDKs) must incorporate the `0x41` prefix into address slicing logic.
+### 3.2 Address Formatting & `CREATE2` Semantics
+- **TRON Address Representation:** TRON uses its own address representation:
+  - **On-chain / Protocol level:** 21-byte hex array prefixed with `0x41` (e.g., `0x41` followed by the 20-byte EVM address slice).
+  - **User / Display level:** Base58Check format string beginning with `'T'` (e.g., `TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t`).
+  - **Solidity level:** Standard 20-byte `address` type in smart contract code.
+- **`CREATE2` Deterministic Deployment:**
+  - High-level Solidity salted creation syntax (`new Contract{salt: salt}(...)`) remains portable across EVM and TVM.
+  - Manual `CREATE2` address calculations (such as in-contract helper functions or off-chain SDKs/scripts) and deployment tooling must account for TRON's address generation algorithm (`0x41` prefix + keccak256 hash truncation) and cannot be assumed to match standard Ethereum address calculation tools in every context.
 
-### 3.3 OpenZeppelin Module & Version Strategy
-- OpenZeppelin Contracts do not come with an official blanket TRON compatibility guarantee.
-- **Strategy:**
-  1. Pin dependencies strictly to official tagged releases.
-  2. Test every imported module (e.g., `UUPSUpgradeable`, `AccessControlEnumerable`, `Pausable`) against solc 0.8.20 with `london` EVM target.
-  3. Perform full deployment and integration testing on TRON Nile testnet prior to mainnet deployment.
+### 3.3 OpenZeppelin Library Integration
+- **No Blanket Compatibility:** Blanket compatibility with OpenZeppelin contract libraries cannot be assumed for TRON/TVM environments.
+- **Validation Requirements:**
+  1. **Tagged Releases:** Projects must use official tagged releases of OpenZeppelin Contracts.
+  2. **Compilation Baseline Verification:** Selected contract modules (e.g., `AccessControl`, `Pausable`, `ReentrancyGuard`) must compile cleanly with the project's baseline compiler (`solc 0.8.20`) and target EVM version (`london`).
+  3. **Module-Level Evaluation:** Compatibility must be demonstrated at the individual module and dependency version level, rather than asserted for the library as a whole.
+  4. **Target Testnet Validation:** Critical modules must undergo functional and deployment testing on the target TRON testnet (Nile/Shasta) prior to production deployment.
+
+### 3.4 Execution Resources & Transaction Costs
+- **Energy:** Quantifies CPU and storage execution required by smart contract instructions.
+- **Bandwidth:** Quantifies transaction data footprint in bytes.
+- **Resource Acquisition:** Accounts cover execution costs using daily free Bandwidth, Bandwidth/Energy allowances obtained by staking TRX, or by burning TRX directly.
+- **`feeLimit` Parameter:** Every TRON transaction envelope includes an explicit `feeLimit` parameter in SUN (1 TRX = 1,000,000 SUN). It caps the maximum TRX an account can burn for energy/bandwidth consumption. If execution exceeds `feeLimit` before completion, the transaction reverts with `OUT_OF_ENERGY` while consuming fees up to the limit.
 
 ---
 
