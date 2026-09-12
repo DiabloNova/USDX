@@ -10,7 +10,7 @@ This roadmap defines the sequential development phases for the USDX fiat-backed 
 
 ```
 +-----------------------------------------------------------------------------------+
-| PHASE 0: Architecture & Foundation Baseline (CURRENT PHASE)                       |
+| PHASE 0: Architecture & Baseline Validation (CURRENT PHASE)                       |
 |  - Toolchain setup (Foundry, solc 0.8.20, EVM london target)                      |
 |  - Core Invariants, System Architecture, Threat Model, Technical Validation       |
 +-----------------------------------------------------------------------------------+
@@ -69,7 +69,11 @@ This roadmap defines the sequential development phases for the USDX fiat-backed 
 
 ---
 
-## 3. Phase Details & Exit Criteria
+## 3. Phase Details & Explicit Readiness Gates
+
+### Phase 0: Architecture & Baseline Validation (Current)
+- **Focus:** Technical validation, toolchain setup, threat modeling, architectural decision records.
+- **Exit Criteria:** Approved architecture, verified toolchain smoke tests passing, zero production smart contract code committed.
 
 ### Phase 0: Architecture & Foundation Baseline (Current)
 - **Focus:** Technical validation, toolchain configuration, threat modeling, system architecture definition, and architectural decision records.
