@@ -2,13 +2,14 @@
 
 ## 1. Overview & Methodology
 
-This document outlines the security architecture and threat landscape for the USDX fiat-backed stablecoin protocol. The threat model analyzes attack vectors across both on-chain smart contracts and off-chain operational systems, categorizing mitigation mechanisms across five security control domains:
+This document outlines the security architecture and threat landscape for the USDX fiat-backed stablecoin protocol. Threat vectors are systematically analyzed across on-chain smart contracts, reserve attestation feeds, backend services, custodian banking, and compliance operations.
 
-1. **On-Chain Security Guarantees:** Hard rules enforced strictly by smart contract code.
-2. **Off-Chain Security Controls:** Mitigations implemented in backend infrastructure, APIs, and key management systems (HSM/KMS).
-3. **Operational Controls:** Human processes, multi-party approvals, separation of duties, and velocity limits.
-4. **Custodian Controls:** Banking agreements, bankruptcy-remote segregation, and independent third-party audits.
-5. **Compliance Controls:** Real-time wallet screening, KYC/AML enforcement, and regulatory sanctions freeze procedures.
+Mitigations are strictly classified into five distinct security control domains:
+1. **Protocol-Enforced Controls:** Technical invariants and rules hard-coded in smart contract logic.
+2. **Reserve-Attestation Controls:** Threshold cryptographic quorum rules and heartbeat checks enforcing solvency ceilings.
+3. **Backend / Operational Controls:** Off-chain infrastructure security, HSM/KMS key management, velocity limits, and multi-party approvals.
+4. **Custodian / Banking Controls:** Legal custody agreements, bankruptcy-remote asset segregation, and audited bank balance statements.
+5. **Compliance / Legal Controls:** Mandatory real-time wallet screening, KYC/AML enforcement, and protocol-enforced sanctions freezing.
 
 ---
 
@@ -16,58 +17,56 @@ This document outlines the security architecture and threat landscape for the US
 
 | ID | Threat Vector | Severity | Attack Description | Mitigation Domain | Primary Defense Mechanism |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **TH-01** | **Compromised Mint Authority** | **Critical** | Attacker steals or compromises the private key of an authorized operational minter. | On-Chain & Operational | On-chain hard solvency cap (`totalSupply + amount <= eligibleReserves`), daily/per-tx velocity mint caps, and instant revocation by Emergency Controller. |
-| **TH-02** | **Compromised Core Backend** | **Critical** | Backend infrastructure compromised; attacker attempts to forge mint requests or manipulate user databases. | On-Chain & Off-Chain | On-chain verification enforces reserve limits and minter signatures. Compromised backend cannot bypass on-chain solvency checks or governance timelocks. |
-| **TH-03** | **Stale or Manipulated Reserve Attestation** | **High** | Attestation feed fails, oracle halts, or attester key compromised to post false high reserve values. | On-Chain & Custodian | On-chain heartbeat expiration timeout (fail-closed state on stale data), multi-attester signature thresholds, and direct custodian API cross-checks. |
-| **TH-04** | **Bank / Custodian Insolvency or Outage** | **High** | Reserve bank goes into receivership or halts wire operations, rendering reserves inaccessible. | Custodian & Operational | Diversification across multiple tier-1 regulated banking partners, overnight US Treasury bill allocations, and instant pause of minting/redemptions. |
-| **TH-05** | **Replay or Duplicate Issuance Requests** | **Medium** | Replaying previously valid signed mint transactions across network forks or within the same contract. | On-Chain & Off-Chain | Mandatory unique request nonces, chain ID inclusion in signatures, and on-chain used-nonce tracking. |
-| **TH-06** | **Governance Key Compromise / Upgrade Abuse** | **Critical** | Governance multisig keys compromised to push malicious contract upgrades or drain reserves. | On-Chain & Operational | Multi-signature requirement (3-of-5), mandatory 48-hour timelock for contract upgrades, public event emitting, and emergency pause veto. |
-| **TH-07** | **Emergency Controller Compromise** | **High** | Compromised emergency key maliciously pauses the contract to create denial-of-service. | On-Chain & Governance | Emergency Controller can ONLY pause (cannot mint, burn, or transfer funds). Governance multisig retains authority to override/unpause and replace key. |
-| **TH-08** | **DEX Price Manipulation & Arbitrage Exploits** | **Medium** | Price of USDX on secondary DEXs (SunSwap) de-pegs due to market panic or flash loan attacks. | Secondary Market | Core protocol mint/burn operates strictly at 1:1 fiat redemption parity. Protocol does not rely on AMM price oracles for solvency. |
-| **TH-09** | **TRON Network Congestion / Energy Exhaustion** | **Medium** | Network spam spikes Energy prices or exhausts contract `feeLimit`, stalling mint/redemption calls. | Operational & Technical | Automated fee-limit buffer configuration, pre-staked TRX Energy reserves, and fallback batching mechanisms. |
-| **TH-10** | **Sanctions / Illicit Flow Exposure** | **High** | Malicious actor attempts to bridge or transfer USDX into sanctioned wallets. | Compliance & On-Chain | Automated real-time wallet screening prior to minting/redemption, on-chain contract `blacklist` / `freeze` capability for law enforcement compliance. |
+| **TH-01** | **Compromised Mint Key** | **Critical** | Attacker compromises private key of an authorized operational minter account. | Protocol-Enforced & Reserve-Attestation | On-chain `totalSupply <= eligibleReserves` invariant limits minting to accepted reserve ceiling. Emergency Controller can pause contract immediately. |
+| **TH-02** | **Compromised Core Backend** | **Critical** | Attacker breaches backend server infrastructure and attempts to forge mint requests or manipulate user state. | Protocol-Enforced & Operational | Backend has no direct minting rights. Mint requests require multi-party operational signatures and are constrained on-chain by the attestation quorum. |
+| **TH-03** | **Stale or Compromised Attestation Feed** | **High** | Attestation feed halts or an individual attestor key is compromised to inflate reserves. | Reserve-Attestation | Multi-attestor threshold quorum (e.g., 2-of-3) prevents single-attestor inflation. On-chain heartbeat expiration forces fail-closed halt on stale data. |
+| **TH-04** | **Bank Outage or Custodian Insolvency** | **High** | Partner custodian bank halts wire operations or faces financial distress. | Custodian & Operational | Off-chain banking agreements and operational pause controls. Solvency invariant prevents new token minting if reserves are inaccessible. |
+| **TH-05** | **Replay or Duplicate Mint Requests** | **Medium** | Replaying valid signed mint payloads across network forks or within the same contract. | Protocol-Enforced | On-chain nonce tracking, chain ID inclusion in signatures, and request expiration timestamps. |
+| **TH-06** | **Governance Key Compromise / Malicious Upgrade** | **Critical** | Governance multisig keys compromised to push malicious UUPS implementation upgrade. | Protocol-Enforced & Operational | 3-of-5 Hardware Multisig + mandatory 48-hour Timelock execution delay allowing public detection and emergency intervention. |
+| **TH-07** | **Emergency Controller Key Compromise** | **High** | Attacker steals emergency key to maliciously pause contract (Denial of Service). | Protocol-Enforced & Governance | Emergency Controller can ONLY pause/freeze; cannot mint, burn, or transfer funds. Governance Multisig can override, unpause, and replace key. |
+| **TH-08** | **DEX Price De-peg / Arbitrage Attack** | **Medium** | Secondary DEX (SunSwap) price fluctuates due to market volatility or flash loans. | Secondary Market | Core protocol mint/burn operates strictly at 1:1 fiat redemption parity. Protocol does not rely on DEX price oracles for solvency. DEX is post-launch. |
+| **TH-09** | **TRON Network Congestion / Energy Exhaustion** | **Medium** | Network spam spikes Energy costs or exhausts transaction `feeLimit`, stalling mint/burn operations. | Operational & Technical | Automated fee-limit buffer configuration, pre-staked TRX Energy reserves, and transaction retry queues. |
+| **TH-10** | **Sanctions / Illicit Address Exposure** | **High** | Sanctioned or illicit actor attempts to hold or transfer USDX tokens on-chain. | Protocol-Enforced & Compliance | Real-time compliance screening prior to mint/redemption, and mandatory protocol-level `blacklist` / `freeze` capability. |
 
 ---
 
-## 3. Detailed Security Domain Control Mapping
+## 3. Explicit Security Domain Control Mapping
 
 ```
 +-----------------------------------------------------------------------------------+
 |                            SECURITY CONTROL DOMAINS                               |
 +-----------------------------------------------------------------------------------+
 
- [ ON-CHAIN GUARANTEES ]
-  - Solvency assertion: totalSupply <= eligibleReserves
-  - Access Control: Role-based permissions (MINTER, BURNER, PAUSER, DEFAULT_ADMIN)
-  - Timelock Enforcement: Execution delay on administrative functions
-  - Blacklist / Freeze: Block transfers to/from sanctioned addresses
+ [ PROTOCOL-ENFORCED CONTROLS ] (Hard On-Chain Smart Contract Logic)
+  - Solvency Enforcer: totalSupply <= eligibleReserves
+  - UUPS Timelock Governance: 48-hour delay on code upgrades
+  - AccessControl Roles: Isolation of MINTER, REDEEMER, PAUSER, DEFAULT_ADMIN
+  - Protocol Blacklist: Freezing transfers to/from sanctioned addresses
 
- [ OFF-CHAIN CONTROLS ]
-  - Hardware Security Modules (HSM) / AWS KMS for signing operational transactions
-  - Strict input validation and sanitization on all backend APIs
-  - Distributed database state machines with idempotency locks
+ [ RESERVE-ATTESTATION CONTROLS ] (On-Chain Cryptographic Quorum)
+  - Multi-Attestor Quorum: Threshold signature validation (e.g., 2-of-3 attesters)
+  - Heartbeat Expiration: Automated fail-closed halt if data age exceeds max threshold
+  - No Unilateral Authority: Zero single-attestor ability to increase reserves
 
- [ OPERATIONAL CONTROLS ]
-  - Separation of duties: Operational minters cannot alter governance roles
-  - Velocity limits: Rolling 24-hour mint/burn caps per operator
-  - Multi-party approval workflows for fiat wire disbursements
+ [ BACKEND / OPERATIONAL CONTROLS ] (Off-Chain Systems & Key Management)
+  - AWS KMS / Hardware Security Modules (HSM) for operational transaction signing
+  - Operational Velocity Caps: 24-hour rolling mint/burn limits per key
+  - Asynchronous Redemption State Machine: Reconciled order state tracking
 
- [ CUSTODIAN CONTROLS ]
-  - Segregated bankruptcy-remote reserve accounts
-  - Daily independent third-party reserve attestations
-  - Tier-1 regulated banking institutions with Federal Reserve / Central Bank access
+ [ CUSTODIAN / BANKING CONTROLS ] (Off-Chain Financial Institutions)
+  - Segregated bankruptcy-remote USD fiat accounts at regulated banking institutions
+  - Independent periodic reserve audit statements
 
- [ COMPLIANCE CONTROLS ]
-  - Automated OFAC, UN, and EU sanctions screening (TRM / Chainanalysis APIs)
-  - Full KYC/AML verification prior to approving fiat-to-crypto minting
-  - Suspicious Activity Report (SAR) filing protocols
+ [ COMPLIANCE / LEGAL CONTROLS ] (Legal & Regulatory Frameworks)
+  - Automated OFAC, UN, and EU sanctions screening (TRM / Chainalysis webhooks)
+  - Full KYC/AML onboarding prior to approving direct fiat-to-token operations
 +-----------------------------------------------------------------------------------+
 ```
 
 ---
 
-## 4. Residual Risks & Technical Assumptions
+## 4. Technical Scope & External Dependencies
 
-1. **TRON Network Security:** The protocol relies on the security and consensus mechanism of the TRON network (Delegated Proof of Stake). Network re-orgs or consensus failures represent external dependencies.
-2. **Oracle / Attestation Reliability:** If all authorized reserve attesters go offline, new minting is disabled (fail-closed). Secondary trading continues uninterrupted unless emergency pause is triggered.
-3. **Legal Regulatory Actions:** Regulatory orders freezing custodian bank accounts cannot be resolved solely on-chain; emergency pause controls exist to prevent systemic imbalance.
+1. **TRON Network Security:** Protocol execution depends on TRON DPoS consensus integrity and active TVM parameters.
+2. **Attestation Quorum Dependency:** If a threshold quorum of attesters goes offline, new minting fails closed automatically. Secondary transfers continue unless globally paused.
+3. **No Unsubstantiated Claims:** Off-chain banking partners, specific Treasury allocation percentages, and legal jurisdictions remain subject to formal operational setup in Phase 3 and Phase 4.
