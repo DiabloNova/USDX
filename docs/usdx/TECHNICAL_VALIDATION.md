@@ -2,13 +2,13 @@
 
 ## 1. Executive Summary
 
-This document evaluates the technical claims and operational assumptions concerning TRON/TVM compatibility, Solidity versions, address formats, native TRON account permissions, resource models (Energy/Bandwidth), deterministic deployment (`CREATE2`), OpenZeppelin contract libraries, contract verification on TRONSCAN, Chainlink Proof of Reserve availability, and SunSwap DEX integration.
+This document evaluates technical claims and operational assumptions concerning TRON/TVM compatibility, Solidity versions, address formats, resource models (Energy/Bandwidth), deterministic deployment (`CREATE2`), OpenZeppelin contract libraries, contract verification on TRONSCAN, Chainlink Proof of Reserve availability, and SunSwap DEX integration.
 
 Claims are classified according to five status categories:
 - **Verified:** Supported by verified EVM/TVM specifications or empirical testing.
-- **Partially Verified:** Valid under specific conditions or configuration flags.
+- **Partially Verified:** Valid under specific network configurations or compiler flags.
 - **Unverified:** Requires live network testing on TRON Nile/Shasta/Mainnet or external partner validation.
-- **Rejected / Incorrect:** Mathematically or architecturally invalid based on verified platform behavior.
+- **Rejected / Incorrect:** Architecturally or technically invalid based on verified platform behavior.
 - **Requires Legal or Domain-Expert Validation:** Operational, regulatory, or custodial claims requiring specialized non-engineering review.
 
 ---
@@ -26,9 +26,9 @@ Claims are classified according to five status categories:
 | **TVM-07** | **Deterministic Deployment (`CREATE2`)** | **Partially Verified** | The `CREATE2` opcode is supported by TVM, and high-level Solidity salted deployment syntax (`new Contract{salt: ...}()`) remains portable. However, manual address calculations and deployment tooling must account for TRON's `0x41` address prefix and address derivation algorithm. |
 | **TVM-08** | **OpenZeppelin Module Compatibility** | **Partially Verified** | OpenZeppelin contracts cannot be assumed to have blanket TRON compatibility. Pinned official tagged releases must be evaluated at the specific module level, compiled under project settings (`solc 0.8.20` + `london`), and verified on target TRON testnets. |
 | **TVM-09** | **Contract Verification on TRONSCAN** | **Verified** | TRONSCAN supports contract source verification via API or Web UI, requiring single-file flattened source or standard JSON input matching exact compiler version, optimization runs, and EVM target. |
-| **TVM-10** | **Chainlink Proof of Reserve (PoR)** | **Unverified** | Chainlink PoR native feed availability on TRON Mainnet is limited compared to Ethereum. Architecture must support fallback signature attestation mechanisms if native Chainlink PoR feeds are unavailable on TRON. |
-| **TVM-11** | **SunSwap Architecture & Integration** | **Unverified** | SunSwap (V1/V2/V3 forks of Uniswap) operates standard constant-product or concentrated liquidity pairs. Token integration requires standard TRC-20 transfer compatibility without fee-on-transfer hooks or unexpected gas traps. |
-| **REG-01** | **Regulatory / Custodial Requirements** | **Requires Legal/Domain Validation** | Claims regarding specific fiat banking permissions, reserve asset eligibility (e.g., Short-term Treasuries vs Cash), attestation frequency, and jurisdiction-specific stablecoin rules require formal legal opinion. |
+| **TVM-10** | **Chainlink Proof of Reserve (PoR)** | **Unverified** | Chainlink PoR native feed availability on TRON Mainnet is limited. Architecture relies on a primary Multi-Attestor Quorum model for reserve updates rather than assuming native Chainlink PoR feeds are available. |
+| **TVM-11** | **SunSwap Architecture & DEX Sequencing** | **Partially Verified** | SunSwap (V1/V2/V3 forks of Uniswap) operates standard constant-product or concentrated liquidity pairs. DEX deployment is strictly post-launch and is NOT a prerequisite for USDX mainnet deployment. |
+| **REG-01** | **Regulatory / Custodial Requirements** | **Requires Legal/Domain Validation** | Claims regarding specific fiat banking permissions, reserve asset eligibility, attestation frequency, and jurisdiction-specific stablecoin rules require formal legal opinion. |
 
 ---
 
@@ -66,6 +66,6 @@ Claims are classified according to five status categories:
 
 ## 4. Unresolved Technical & Domain Decisions
 
-1. **Oracle Deployment on TRON:** Whether to rely on Chainlink PoR or deploy a custom Threshold Ed25519 / ECDSA signature verifier contract for reserve attestation.
-2. **On-Chain Timelock Architecture:** Selection between OpenZeppelin `TimelockController` modified for TVM vs. a custom multisig execution delay contract.
-3. **Legal / Regulatory Framework:** Clarification of eligible reserve assets and audit frequency mandated by target regulatory jurisdictions.
+1. **Target Network Shanghai Verification:** Confirm active parameters on TRON Nile and Mainnet nodes prior to Phase 1 contract compilation finalizing EVM target flags.
+2. **Attestor Quorum Key Management:** Selection of signature aggregation scheme (e.g., threshold Schnorr vs. ECDSA array verification) for the Reserve Verifier contract.
+3. **Legal / Regulatory Framework:** Qualification of eligible reserve asset composition (cash deposits vs. short-term US Treasury bills) by qualified legal counsel.
